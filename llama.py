@@ -30,7 +30,7 @@ class LayerNorm(torch.nn.Module):
         self.weight = nn.Parameter(torch.ones(dim))
         self.bias = nn.Parameter(torch.zeros(dim))
 
-    def _norm(self, x):
+    def _norm(self, x: Tensor):
         """
         Compute layer normalization by subtracting the mean and dividing by 
         the standard deviation along the last dimension. Use the standard
@@ -42,10 +42,11 @@ class LayerNorm(torch.nn.Module):
         Returns:
             torch.Tensor: The normalized tensor.
         """
-        # todo
-        raise NotImplementedError
+        # TODO: check
+        # return torch.nn.LayerNorm(x.size(-1), self.eps)(x)
+        return (x - x.mean(dim=-1, keepdim=True)) / torch.sqrt(x.var(dim=-1, unbiased=False, keepdim=True) + self.eps)
 
-    def forward(self, x):
+    def forward(self, x: Tensor):
         """
         Apply layer normalization.
 
