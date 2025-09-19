@@ -43,8 +43,8 @@ class LayerNorm(torch.nn.Module):
             torch.Tensor: The normalized tensor.
         """
         # TODO: check
-        # return torch.nn.LayerNorm(x.size(-1), self.eps)(x)
         return (x - x.mean(dim=-1, keepdim=True)) / torch.sqrt(x.var(dim=-1, unbiased=False, keepdim=True) + self.eps)
+        # return torch.nn.LayerNorm(x.size(-1), self.eps)(x)
 
     def forward(self, x: Tensor):
         """
@@ -88,14 +88,16 @@ class Attention(nn.Module):
         Jointly compute Scaled Dot Product Attention (see Section 3.2.1 in
         https://arxiv.org/abs/1706.03762 for details). The query, key, and
         value tensors each have shape (bs, n_local_heads, seqlen, head_dim).
-        An optimal implemention will jointly computing attention for multiple
+        An optimal implemention will jointly compute attention for multiple
         heads (n_local_heads of them) at once using matrix/tensor operations.
 
         Make sure to use attention_dropout (self.attn_dropout) on the computed
         attention matrix before applying it to the value tensor.
         '''
-        # todo
-        raise NotImplementedError
+        # TODO: check
+        scores = query @ key.transpose(-2, -1) / math.sqrt(key.size(-1))
+        attn = self.attn_dropout(scores.softmax(-1))
+        return attn @ value
 
     def forward(
         self,
@@ -296,24 +298,24 @@ class Llama(LlamaPreTrainedModel):
         return idx
 
 def load_pretrained(checkpoint):
-  device = 'cuda' if torch.cuda.is_available() else 'cpu' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
-  #dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
-  dtype = "float32"
+    device = 'cuda' if torch.cuda.is_available() else 'cpu' # examples: 'cpu', 'cuda', 'cuda:0', 'cuda:1', etc.
+    #dtype = 'bfloat16' if torch.cuda.is_available() and torch.cuda.is_bf16_supported() else 'float16' # 'float32' or 'bfloat16' or 'float16'
+    dtype = "float32"
 
-  torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
-  torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
-  device_type = 'cuda' if 'cuda' in device else 'cpu' # for later use in torch.autocast
-  ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
-  ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
+    torch.backends.cuda.matmul.allow_tf32 = True # allow tf32 on matmul
+    torch.backends.cudnn.allow_tf32 = True # allow tf32 on cudnn
+    device_type = 'cuda' if 'cuda' in device else 'cpu' # for later use in torch.autocast
+    ptdtype = {'float32': torch.float32, 'bfloat16': torch.bfloat16, 'float16': torch.float16}[dtype]
+    ctx = nullcontext() if device_type == 'cpu' else torch.amp.autocast(device_type=device_type, dtype=ptdtype)
 
-  # init from a model saved in a specific directory
-  checkpoint_dict = torch.load(checkpoint, map_location=device)
-  config = LlamaConfig(**checkpoint_dict['model_args'])
-  model = Llama(config)
-  state_dict = checkpoint_dict['model']
-  unwanted_prefix = '_orig_mod.'
-  for k,v in list(state_dict.items()):
-      if k.startswith(unwanted_prefix):
-          state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
-  model.load_state_dict(state_dict, strict=False)
-  return model
+    # init from a model saved in a specific directory
+    checkpoint_dict = torch.load(checkpoint, map_location=device)
+    config = LlamaConfig(**checkpoint_dict['model_args'])
+    model = Llama(config)
+    state_dict = checkpoint_dict['model']
+    unwanted_prefix = '_orig_mod.'
+    for k,v in list(state_dict.items()):
+        if k.startswith(unwanted_prefix):
+            state_dict[k[len(unwanted_prefix):]] = state_dict.pop(k)
+    model.load_state_dict(state_dict, strict=False)
+    return model
